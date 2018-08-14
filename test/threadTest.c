@@ -1,12 +1,16 @@
-// JOHIC MES 8182049 
-// Thread Test Servers
+// JOHIC MES 
+// 2018/08/13
+// Last revision - See github.
+// Thread Test for CKeyword
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <time.h>
+// Include standard libraries
+#include <stdio.h> // Input output
+#include <stdlib.h> // libraries
+#include <pthread.h> // threads
+#include <semaphore.h> // semaphores
+#include <time.h> // time
 
+// Threads and mutex are global variables
 pthread_t Helper[]; 
 pthread_mutex_t accessHash;
 
@@ -33,38 +37,86 @@ struct arg_struct {
     int sizeOfStructure;
 };
 
-void *funcHelper(void *arguments){ // Function that each thread will execute. Could pass the file to go through by parameters. The "work" gets done here.
-    struct arg_struct *args = arguments;
-    int idexOfThread = args -> threadIndex;
-    int threadCount =  args -> numOfthreads;
-    int* listOfData = args -> data;
-    int lengthOfStructure =  args -> sizeOfStructure;
+
+/*
+FuncHelper is the function that each thread will execute. Basically its the strating point. Because each thread 
+gets its own copy of threadTest to execute simultaneously it is crutial to implement a mutex lock to assure
+that these threads don't break absolutely everything! On the upside the task is spread out between many workers 
+so theoretically it should speed up the execution of the program. 
+
+- This section needs work to find a better shared rescource to work on to solidify the test.
+    *Work in progress
+*/
+void *funcHelper(void *arguments){ 
+    struct arg_struct *args = arguments;                // Builds the structure from the argument
+    int idexOfThread = args -> threadIndex;             // extracts the thread index and assigns it to idexOfThread
+    int threadCount =  args -> numOfthreads;            // extracts the number of threads and assigns it to threadCount
+    int* listOfData = args -> data;                     // Pulls the data structure to iterate through out of the structure
+    int lengthOfStructure =  args -> sizeOfStructure;   // extracts the size of the structure and assigns it to lengthOfStructure
     
-    int threadPosition = idexOfThread; // strating position
+    int threadPosition = idexOfThread; // Defines the starting position of a thread in the data structure to iterate through
     
-    while (threadPosition < lengthOfStructure){
-        printf ("Helper %d is doing his thing @ %d\n",idexOfThread,threadPosition);
-        pthread_mutex_lock(&accessHash);          // ONLY ONE HELPER AT A TIME MAY GET TO THE HASHMAP
+    while (threadPosition < lengthOfStructure){   // Loops until the index surpasses the lenght of the structure
+        printf ("Helper %d is doing his thing @ %d\n",idexOfThread,threadPosition); // Prints the position (Document etc) on which the thread is currently working
+        
+        /* 
+        First Mutex barrier. When a thread accesse
+        it it locks all the other threads out of 
+        the critical section.
+        */
+        pthread_mutex_lock(&accessHash);  
+        
+        /* 
+        This is the critical section. 
+        Any oprations on shared resources 
+        that are crutial to synchronize 
+        happens here!!! 
+        */
         printf("Helper %d found the value: %d\n",idexOfThread,listOfData[threadPosition]);
-        pthread_mutex_unlock(&accessHash);        // DONE! Releases the MUTEX. 
-        threadPosition += threadCount;// increment by number of threads!
+        
+        /* 
+        Second mutex barrier. When the critical 
+        section is completed the thread releases 
+        (unlocks) the mutex and allows other 
+        threads to access the critical region.  
+        */
+        pthread_mutex_unlock(&accessHash);        
+        
+        threadPosition += threadCount; // Increment the thread position by number of threads. See point 3 of the structure.           
     }
     return(NULL);
 }
 
-int main(){ // CREATES SEMAPHORES AND MUTEXES
+/*
+This is the main execution block of code. Its job is to create destroy and coordinate the threads to efficiently 
+solve the problem at hand. It also times the execution of the program for testing purposes. In a nutshell these 
+are the task it accomplishes:
+    - Create the threads the mutex and dummy data necessary for the programm
+    - Join the threads fro their execution
+    - Destroy the threads and mutex.
+
+Here is what is left to implement:
+    - Memory management for mallocs defined.
+*/
+int main(){
+    // This section gets the time at the start of the program
     clock_t start, end;
     double cpu_time_used;
     start = clock();
     
-    int i;
-    int userDefinedValue = 1;
-    int testDataStructure[]= {0,1,2,3,4,5,6,7,8,9,10,11,12,13}; // Random test data structure to use the mod value
-    struct arg_struct args[userDefinedValue];
+    int i; // basica variable used to increment the for loops.
+    int userDefinedValue = 5; // Number of threads to create (Defined by user)
+    int testDataStructure[]= {0,1,2,3,4,5,6,7,8,9,10,11,12,13}; // Basic test data (Array)
+    struct arg_struct args[userDefinedValue]; // Defines a array of arg_struct's (defined line 33) 
     
-    pthread_t Helper[userDefinedValue];
-    pthread_mutex_init(&accessHash,NULL);  // INIT ALL THE MUTEX TO BE USED
+    pthread_t Helper[userDefinedValue]; // Initialises a list of threads the size of userDefinedValue
+    pthread_mutex_init(&accessHash,NULL); // Initialises a mutex (Semaphore) named Acess Hash but could be named more appropriately.
     
+    /*
+    This section creates the threads and their accompanying structure (Passed via arguments).
+        - Loops thenumber of times defined by the user to create that number of threads
+        - Defines all the elements of teh structure explained at line 18 
+    */
     for(i=0;i<userDefinedValue;i++){
         args[i].data = (int*)malloc(sizeof(int) * sizeof(testDataStructure)/sizeof(testDataStructure[0]));
         args[i].data = testDataStructure;
@@ -74,17 +126,20 @@ int main(){ // CREATES SEMAPHORES AND MUTEXES
         if (pthread_create(&Helper[i],NULL,(void *)funcHelper,(void *)&args[i]) != 0){
             printf("Uh-oh!\n");
             return -1;
-        } 
+        }
     }
-      
+    
+    // This section joins all the threads together allowing the to work in conjunction. 
     for(i=0;i<userDefinedValue;i++)
-        pthread_join(Helper[i],NULL);    //JOINS EM 
+        pthread_join(Helper[i],NULL);
     
-    pthread_mutex_destroy(&accessHash);   // KILLS EVERYTHING 
+    // This section destroys the mutex after it is not of any use anymore. (Memory saving)
+    pthread_mutex_destroy(&accessHash);    
     
+    // This section calculates the end time of the program. Subtract the start value and prints to the user.
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("Time for %d threads to do the work is %f clocks.\n", userDefinedValue, cpu_time_used);
     
-    return 0;
+    return 0; // End of entire program
 }
