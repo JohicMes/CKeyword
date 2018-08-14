@@ -28,7 +28,8 @@ It contains 4 variables:
             - Thread 2 goes to positions 1 and 3.
         This covers the entire array.
     4. sizeOfStructure is an integer value that stores the size of the data structure. This is to stop going out of bounds while
-       executing the function depicted in 3. 
+       executing the function depicted in 3.
+    5. A pointer that points to a value that will be the shared alue that is critical since data will be written and read from it. 
 */
 struct arg_struct { 
     int* data; 
@@ -106,7 +107,14 @@ int main(){
     
     int i; // basica variable used to increment the for loops.
     int userDefinedValue = 5; // Number of threads to create (Defined by user)
-    int testDataStructure[]= {0,1,2,3,4,5,6,7,8,9,10,11,12,13}; // Basic test data (Array)
+    int testStructureSize = 20000; // Size of the test sample
+    int testDataStructure[testStructureSize]; // Basic test data declaration(Array)
+    
+    // Builds the array 1 to 20 000
+    for(i=0;i<testStructureSize;i++){ 
+        testDataStructure[i] = i; // Assigns the value to the array position
+    }
+    
     struct arg_struct args[userDefinedValue]; // Defines a array of arg_struct's (defined line 33) 
     
     pthread_t Helper[userDefinedValue]; // Initialises a list of threads the size of userDefinedValue
@@ -118,14 +126,14 @@ int main(){
         - Defines all the elements of teh structure explained at line 18 
     */
     for(i=0;i<userDefinedValue;i++){
-        args[i].data = (int*)malloc(sizeof(int) * sizeof(testDataStructure)/sizeof(testDataStructure[0]));
-        args[i].data = testDataStructure;
-        args[i].threadIndex = i;
-        args[i].numOfthreads = userDefinedValue;
-        args[i].sizeOfStructure = (sizeof(testDataStructure)/sizeof(testDataStructure[0]));
-        if (pthread_create(&Helper[i],NULL,(void *)funcHelper,(void *)&args[i]) != 0){
-            printf("Uh-oh!\n");
-            return -1;
+        args[i].data = (int*)malloc(sizeof(int) * sizeof(testDataStructure)/sizeof(testDataStructure[0])); // Allocates memory for the data structure
+        args[i].data = testDataStructure; // Assigns the data structure
+        args[i].threadIndex = i; // assigns the thread position (of creation)
+        args[i].numOfthreads = userDefinedValue; // assigns the nuber of threads created 
+        args[i].sizeOfStructure = (sizeof(testDataStructure)/sizeof(testDataStructure[0])); // Assigns the size of the data structure 
+        if (pthread_create(&Helper[i],NULL,(void *)funcHelper,(void *)&args[i]) != 0){ // Creates therad and ends programm if the creation is faulty
+            printf("Creating a thread failed! (line 126) Terminate program.\n"); // Thread creation failed!
+            return -1; // Terminates
         }
     }
     
